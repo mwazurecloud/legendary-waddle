@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standardized Patient Attestation Form</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; line-height: 1.4; padding: 20px; max-width: 850px; margin: auto; background-color: #f4f7f9; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        /* CORRECTED HEADER PER INITIAL INSTRUCTIONS */
+        .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 25px; padding-bottom: 15px; }
+        .header h1 { font-size: 1.8em; font-weight: bold; margin: 0; text-transform: uppercase; }
+        .header h2 { font-size: 1.3em; margin: 5px 0; font-weight: normal; }
+        .header h3 { font-size: 1em; margin: 0; font-weight: normal; }
+
+        .field-group { margin-bottom: 18px; padding: 15px; border: 1px solid #e1e4e8; border-radius: 6px; background: #fff; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #222; font-size: 0.95em; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1rem; }
+        input[readonly] { background-color: #f9f9f9; color: #444; border: 1px solid #ddd; }
+        .flex-row { display: flex; gap: 15px; }
+        .flex-row div { flex: 1; }
+
+        .sig-wrapper { position: relative; width: 100%; height: 160px; background: #fff; border: 2px solid #333; border-radius: 4px; }
+        canvas { width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+        
+        .warning-box { color: #b30000; font-size: 0.85em; font-weight: bold; margin-top: 10px; padding: 10px; border: 1px solid #b30000; background: #fff5f5; }
+        #qrcode { margin-top: 10px; padding: 10px; border: 1px solid #ccc; display: inline-block; background: white; }
+        
+        .btn { width: 100%; padding: 18px; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; font-weight: bold; margin-top: 10px; }
+        .btn-blue { background-color: #004a99; }
+        .btn-green { background-color: #28a745; display: none; }
+        .btn-clear { width: auto; padding: 5px 10px; font-size: 0.75em; background: #666; margin-top: 5px; }
+
+        .admin-section { display: none; margin-top: 20px; background: #fffbe6; border: 2px solid #ffe58f; padding: 20px; border-radius: 8px; }
+        .locked { pointer-events: none; opacity: 0.7; filter: grayscale(100%); }
+    </style>
+</head>
+<body>
+
+<div class="container" id="formContainer">
+    <div class="header">
+        <h1>Standardized Patient Attestation Form</h1>
+        <h2>Walter Reed National Military Medical Center</h2>
+        <h3>Contract No. HT001420P0200</h3>
+    </div>
+
+    <form id="attestationForm">
+        <div class="field-group"><label>1. Department / Course</label><input type="text" id="f1" oninput="updateAll()"></div>
+        <div class="field-group"><label>2. Date</label><input type="date" id="f2" onchange="updateAll()"></div>
+        <div class="field-group"><label>3. Event Code</label><input type="text" id="f3" readonly></div>
+        <div class="field-group"><label>4. Standardized Patient Legal Name</label><input type="text" id="f4" oninput="updateAll()"></div>
+        <div class="field-group"><label>5. Event Topic</label><input type="text" id="f5" list="topicList"><datalist id="topicList"><option value="Physical Exam Training"><option value="History Taking"></datalist></div>
+        
+        <div class="field-group">
+            <label>6. Event Schedule Time (hh:mm to hh:mm)</label>
+            <div class="flex-row">
+                <input type="time" id="f6_start">
+                <input type="time" id="f6_stop">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <label style="color: #004a99;">7. Schedule Time (For Billable Hours Calculation)</label>
+            <div class="flex-row">
+                <input type="time" id="f7_start" onchange="calcBilling()">
+                <input type="time" id="f7_stop" onchange="calcBilling()">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="flex-row">
+                <div><label>8. Billable Hours</label><input type="text" id="f8" readonly></div>
+                <div><label>9. Rate</label><input type="text" value="$25.00" readonly></div>
+                <div><label>10. Total To Be Paid</label><input type="text" id="f10" readonly style="font-weight:bold; color:#28a745;"></div>
+            </div>
+        </div>
+        
+        <div class="field-group">
+            <label>11. Standardized Patient Signature</label>
+            <div class="sig-wrapper"><canvas id="sp_sig"></canvas></div>
+            <button type="button" class="btn btn-clear" onclick="clearSig('sp_sig')">Clear Signature</button>
+            <div class="warning-box">
+                FEDERAL WARNING: Knowingly submitting false information on a federal form carries criminal fines and / or prison time if convicted. By signing, you attest that the billable hours are accurate.
+            </div>
+        </div>
+
+        <div class="field-group">
+            <label>12. Send Invoice Action</label>
+            <button type="button" id="btn12" class="btn btn-blue" onclick="sendToAdmin()">Send Invoice to mark.j.wyn.civ@health.mil</button>
+        </div>
+
+        <div class="field-group">
+            <label>13. QR Code Reference (Event-Name)</label>
+            <div id="qrcode"></div>
+            <p id="qr-text" style="font-family: monospace; font-size: 0.8em; margin-top:5px;"></p>
+        </div>
+
+        <div id="admin_area" class="admin-section">
+            <label>14. Administrator Signature (Mark J. Wyn)</label>
+            <div class="sig-wrapper"><canvas id="admin_sig"></canvas></div>
+            <button type="button" class="btn btn-clear" onclick="clearSig('admin_sig')">Clear Signature</button>
+            <button type="button" id="btn15" class="btn btn-green" onclick="finalizeForDeltonia()">Submit Finalized Invoice to deltonia.m.shropshire.ctr@health.mil</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.getElementById('f2').value = new Date().toISOString().split('T')[0];
+    const qrcode = new QRCode(document.getElementById("qrcode"), { width: 128, height: 128 });
+
+    function updateAll() {
+        const dept = document.getElementById('f1').value.toUpperCase().replace(/\s/g, '');
+        const dateRaw = document.getElementById('f2').value.split('-').join('').substring(2);
+        const code = dept + dateRaw;
+        document.getElementById('f3').value = code;
+        const qrData = code + "-" + (document.getElementById('f4').value || "NAME");
+        document.getElementById('qr-text').innerText = qrData;
+        qrcode.makeCode(qrData);
+    }
+
+    function calcBilling() {
+        const s = document.getElementById('f7_start').value;
+        const e = document.getElementById('f7_stop').value;
+        if (s && e) {
+            let diff = (new Date(`1970-01-01T${e}`) - new Date(`1970-01-01T${s}`)) / 3600000;
+            if (diff < 0) diff += 24;
+            document.getElementById('f8').value = diff.toFixed(2);
+            document.getElementById('f10').value = "$" + (diff * 25).toFixed(2);
+        }
+    }
+
+    function setupCanvas(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        ctx.scale(ratio, ratio);
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#000';
+
+        let drawing = false;
+        const getPos = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        };
+
+        const start = (e) => { if (e.cancelable) e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+        const move = (e) => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); if(canvasId === 'admin_sig') document.getElementById('btn15').style.display = 'block'; };
+        
+        canvas.addEventListener('mousedown', start);
+        canvas.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('touchstart', start, {passive: false});
+        canvas.addEventListener('touchmove', move, {passive: false});
+        canvas.addEventListener('touchend', () => drawing = false);
+    }
+
+    function clearSig(id) {
+        const c = document.getElementById(id);
+        c.getContext('2d').clearRect(0, 0, c.width, c.height);
+        if(id === 'admin_sig') document.getElementById('btn15').style.display = 'none';
+    }
+
+    setupCanvas('sp_sig');
+
+    function sendToAdmin() {
+        document.getElementById('admin_area').style.display = 'block';
+        document.getElementById('btn12').disabled = true;
+        document.getElementById('btn12').innerText = "Invoice Routed to Mark J. Wyn";
+        setTimeout(() => setupCanvas('admin_sig'), 150);
+    }
+
+    function finalizeForDeltonia() {
+        if(confirm("Submit final invoice to Deltonia Shropshire? This will lock all records.")) {
+            document.getElementById('formContainer').classList.add('locked');
+            const all = document.querySelectorAll('input, button, canvas');
+            all.forEach(el => el.disabled = true);
+            alert("Finalized. Record transmitted to Deltonia Shropshire.");
+        }
+    }
+
+    updateAll();
+</script>
+</body>
+</html>
